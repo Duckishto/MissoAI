@@ -1,0 +1,91 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [preview, production]
+        default: preview
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - working-directory: apps/api
+        run: pip install -e .
+
+      # Migrations run before the new image ships, so the container never
+      # starts against a schema it does not know.
+      - name: Apply migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: alembic upgrade head
+
+  api:
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      - working-directory: apps/api
+        run: npm ci
+
+      # Wrangler builds and pushes the container image as part of deploy.
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          command: >-
+            deploy ${{ inputs.environment == 'preview' && '--env preview' || '' }}
+
+  web:
+    needs: api
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      - working-directory: apps/web
+        run: npm ci
+
+      - working-directory: apps/web
+        run: npx opennextjs-cloudflare build
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: >-
+            deploy ${{ inputs.environment == 'preview' && '--env preview' || '' }}
+
+  smoke:
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health checks
+        run: |
+          curl -fsS "${{ vars.API_URL }}/edge-health"
+          curl -fsS "${{ vars.API_URL }}/health"
+          curl -fsS "${{ vars.API_URL }}/health/ready"
+          curl -fsS -o /dev/null "${{ vars.WEB_URL }}"

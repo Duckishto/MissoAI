@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "adaptive-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  "kv_namespaces": [
+    { "binding": "NEXT_INC_CACHE_KV", "id": "replace-with-your-kv-id" }
+  ],
+
+  "vars": {
+    "NEXT_PUBLIC_API_URL": "https://api.example.com"
+  },
+
+  "routes": [
+    { "pattern": "app.example.com", "custom_domain": true }
+  ],
+
+  "env": {
+    "preview": {
+      "name": "adaptive-web-preview",
+      "vars": { "NEXT_PUBLIC_API_URL": "https://adaptive-api-preview.workers.dev" }
+    }
+  }
+}

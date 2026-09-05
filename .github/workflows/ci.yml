@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: adaptive_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/adaptive_test
+      JWT_SECRET: ci-secret-value-at-least-32-characters-long
+      ENVIRONMENT: local
+      AI_ENABLED: "false"
+      COOKIE_SECURE: "false"
+      RUN_DB_TESTS: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - working-directory: apps/api
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        working-directory: apps/api
+        run: ruff check .
+
+      # Migrations run forwards and backwards, so a broken downgrade is
+      # caught here rather than during an incident.
+      - name: Migrate up and down
+        working-directory: apps/api
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: Test
+        working-directory: apps/api
+        run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - working-directory: apps/web
+        run: npm ci
+
+      - working-directory: apps/web
+        run: npm run typecheck
+
+      - working-directory: apps/web
+        run: npm run build
+
+  edge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - working-directory: apps/api
+        run: npm ci
+
+      - working-directory: apps/api
+        run: npm run typecheck
+
+      # Catches a broken Dockerfile before Cloudflare tries to build it.
+      - name: Build container image
+        working-directory: apps/api
+        run: docker build --platform linux/amd64 -t adaptive-api:ci .

@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/*
+  Palette rule for this product: observation and inference never share a
+  colour. Petrol marks what was actually recorded; violet marks what the
+  system inferred from it. Nothing decorative uses either.
+*/
+:root {
+  --paper: #f2f4f6;
+  --paper-raised: #fbfcfd;
+  --ink: #171b22;
+  --ink-2: #5c6675;
+  --ink-3: #8b95a3;
+  --rule: #d8dde3;
+
+  --observed: #1b4d6b;
+  --observed-soft: #dfe9ef;
+  --inferred: #6b4e8f;
+  --inferred-soft: #e8e2f0;
+  --attention: #b0303c;
+
+  --measure: 62ch;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-observed: var(--observed);
+  --color-inferred: var(--inferred);
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
+  --font-reading: var(--font-newsreader), ui-serif, Georgia, serif;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Question stems are read carefully, so they get serif and more leading. */
+.reading {
+  font-family: var(--font-reading);
+  font-size: 1.1875rem;
+  line-height: 1.65;
+  max-width: var(--measure);
+}
+
+:where(a, button, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--observed);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

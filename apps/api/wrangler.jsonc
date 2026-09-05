@@ -1,0 +1,62 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "adaptive-api",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  "containers": [
+    {
+      "class_name": "Backend",
+      "image": "./Dockerfile",
+      "max_instances": 3,
+      "instance_type": "standard"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [{ "class_name": "Backend", "name": "BACKEND" }]
+  },
+
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Backend"] }],
+
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "adaptive-media" }
+  ],
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    "AI_ENABLED": "false",
+    "ALLOWED_ORIGINS": "https://app.example.com"
+  },
+
+  // Secrets, set with `wrangler secret put`, never in this file:
+  //   DATABASE_URL, JWT_SECRET, AI_API_KEY
+
+  "routes": [
+    { "pattern": "api.example.com", "custom_domain": true }
+  ],
+
+  "env": {
+    "preview": {
+      "name": "adaptive-api-preview",
+      "vars": {
+        "ENVIRONMENT": "preview",
+        "AI_ENABLED": "false",
+        "ALLOWED_ORIGINS": "https://preview.example.com"
+      },
+      "containers": [
+        {
+          "class_name": "Backend",
+          "image": "./Dockerfile",
+          "max_instances": 1,
+          "instance_type": "dev"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "MEDIA", "bucket_name": "adaptive-media-preview" }
+      ]
+    }
+  }
+}

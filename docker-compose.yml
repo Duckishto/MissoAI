@@ -1,0 +1,45 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: adaptive
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./apps/api
+    env_file: .env
+    environment:
+      # Inside the compose network the database is reachable by service name.
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/adaptive
+      ENVIRONMENT: local
+      COOKIE_SECURE: "false"
+      ALLOWED_ORIGINS: '["http://localhost:3000"]'
+    # Reload on save. Editing files on the host restarts the server in the
+    # container, so the edit loop is the same as running it natively.
+    command: >-
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      --reload-dir /srv/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./apps/api/app:/srv/app:ro
+      - ./apps/api/migrations:/srv/migrations:ro
+      - ./apps/api/scripts:/srv/scripts:ro
+      - ./apps/api/tests:/srv/tests:ro
+
+volumes:
+  pgdata:

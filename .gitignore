@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+openapi.json
+
+# Node
+node_modules/
+.next/
+.open-next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+cloudflare-env.d.ts
+
+# Environment. Never commit real values.
+.env
+.env.local
+.env.*.local
+.dev.vars
+.dev.vars.*
+
+# Wrangler
+.wrangler/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

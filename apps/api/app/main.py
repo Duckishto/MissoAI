@@ -60,6 +60,21 @@ def create_app() -> FastAPI:
             await session.execute(text("SELECT 1"))
         return {"status": "ready"}
 
+    @app.get("/health/provider", tags=["ops"])
+    async def provider() -> dict[str, object]:
+        """Whether the AI key reaches the provider.
+
+        Reachability only. The upstream body carries the account email, the
+        credit balance and a key preview, none of which belongs on a public
+        endpoint.
+        """
+        if not settings.ai_enabled:
+            return {"ai_enabled": False}
+        from app.modules.ai.client import check_provider
+
+        result = await check_provider()
+        return {"ai_enabled": True, "reachable": result["status"] == 200}
+
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(assessment_router, prefix="/api/v1")
     app.include_router(research_router, prefix="/api/v1")

@@ -11,6 +11,7 @@
 		"enabled": true
 	},
 	"workers_dev": true,
+	"preview_urls": false,
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
@@ -21,15 +22,10 @@
 			"id": "09ac0bbe64f2414c9f21b1a99c94b12c"
 		}
 	],
+	// The browser bundle does not read this. NEXT_PUBLIC_* is compiled in at
+	// build time from apps/web/.env.production; this entry only gives the
+	// Worker the value at runtime.
 	"vars": {
 		"NEXT_PUBLIC_API_URL": "https://adaptive-api.rondopuffin.workers.dev"
-	},
-	"env": {
-		"preview": {
-			"name": "adaptive-web-preview",
-			"vars": {
-				"NEXT_PUBLIC_API_URL": "https://adaptive-api-preview.workers.dev"
-			}
-		}
 	}
 }

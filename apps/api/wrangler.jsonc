@@ -10,6 +10,7 @@
 		"enabled": true
 	},
 	"workers_dev": true,
+	"preview_urls": false,
 	"containers": [
 		{
 			"class_name": "Backend",
@@ -38,26 +39,24 @@
 		{
 			"binding": "MEDIA",
 			"bucket_name": "adaptive-media"
-		},
-		{
-			"bucket_name": "adaptive-media",
-			"binding": "adaptive_media"
 		}
 	],
 	"vars": {
 		"ENVIRONMENT": "production",
-		"AI_ENABLED": "false",
+		"AI_ENABLED": "true",
 		"ALLOWED_ORIGINS": "[\"https://adaptive-web.rondopuffin.workers.dev\"]"
 	},
-	// Secrets, set with `wrangler secret put`, never in this file:
+	// Secrets, set with `wrangler secret put NAME --env=""`, never in this file:
 	//   DATABASE_URL, JWT_SECRET, AI_API_KEY
 	"env": {
 		"preview": {
 			"name": "adaptive-api-preview",
+			"workers_dev": true,
+			"preview_urls": false,
 			"vars": {
 				"ENVIRONMENT": "preview",
 				"AI_ENABLED": "false",
-				"ALLOWED_ORIGINS": "https://preview.example.com"
+				"ALLOWED_ORIGINS": "[\"https://adaptive-web-preview.rondopuffin.workers.dev\"]"
 			},
 			"containers": [
 				{

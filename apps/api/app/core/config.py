@@ -75,11 +75,16 @@ class Settings(BaseSettings):
     # Phase 0 runs with this off. Every AI call path returns fixtures instead,
     # so the whole app is developable and testable without spending tokens.
     ai_enabled: bool = False
-    ai_base_url: str = "https://gateway.ai.cloudflare.com"
+    # MaxPlus speaks the Anthropic Messages API but authenticates with a
+    # bearer token rather than x-api-key.
+    ai_base_url: str = "https://api.maxplus-ai.cc"
     ai_api_key: str | None = None
+    ai_auth_scheme: Literal["bearer", "x-api-key"] = "bearer"
+    ai_anthropic_version: str = "2023-06-01"
     ai_model: str = "claude-sonnet-4-6"
     ai_embedding_model: str = "text-embedding-3-small"
     ai_max_output_tokens: int = 4096
+    ai_timeout_seconds: float = 120.0
 
     # Object storage (R2, via the Worker's binding or S3-compatible API) -----
     media_bucket: str = "adaptive-media"

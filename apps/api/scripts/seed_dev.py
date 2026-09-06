@@ -1,10 +1,16 @@
 """Minimal dev seed: one instructor, one student, one course, three questions.
 
 Enough to click through the Phase 0 flow end to end. Safe to re-run.
+
+Passwords come from SEED_PASSWORD. If it is unset a random one is generated
+and printed once, so a shared literal never ends up committed and then reused
+against a deployment with real participants on it.
 """
 
 import asyncio
+import os
 import pathlib
+import secrets
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -57,6 +63,9 @@ QUESTIONS = [
 
 
 async def main() -> None:
+    password = os.environ.get("SEED_PASSWORD") or secrets.token_urlsafe(18)
+    generated = "SEED_PASSWORD" not in os.environ
+
     async with get_sessionmaker()() as db:
         instructor = await db.scalar(
             select(User).where(func.lower(User.email) == "instructor@example.edu")
@@ -64,7 +73,7 @@ async def main() -> None:
         if instructor is None:
             instructor = User(
                 email="instructor@example.edu",
-                password_hash=hash_password("dev-password-change-me"),
+                password_hash=hash_password(password),
                 display_name="Dev Instructor",
                 role="instructor",
             )
@@ -77,7 +86,7 @@ async def main() -> None:
         if student is None:
             student = User(
                 email="student@example.edu",
-                password_hash=hash_password("dev-password-change-me"),
+                password_hash=hash_password(password),
                 display_name="Dev Student",
                 role="student",
             )
@@ -123,6 +132,8 @@ async def main() -> None:
 
         await db.commit()
         print("seeded: instructor@example.edu / student@example.edu")
+        if generated:
+            print(f"generated password (shown once): {password}")
 
 
 if __name__ == "__main__":

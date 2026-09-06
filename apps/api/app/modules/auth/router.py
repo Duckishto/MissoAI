@@ -15,6 +15,10 @@ from app.modules.auth.schemas import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE = "aa_refresh"
+# Must match where the router is actually mounted. A cookie scoped to /auth
+# is never sent to /api/v1/auth/refresh, and the failure looks like an
+# expired session rather than a misconfiguration.
+REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 
 def _set_refresh_cookie(response: Response, raw: str) -> None:
@@ -27,7 +31,7 @@ def _set_refresh_cookie(response: Response, raw: str) -> None:
         secure=settings.cookie_secure,
         samesite="lax",
         domain=settings.cookie_domain,
-        path="/auth",
+        path=REFRESH_COOKIE_PATH,
     )
 
 
@@ -75,7 +79,7 @@ async def refresh(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(user: CurrentUser, response: Response, db: DbSession) -> None:
     await service.revoke_all(db, user)
-    response.delete_cookie(REFRESH_COOKIE, path="/auth")
+    response.delete_cookie(REFRESH_COOKIE, path=REFRESH_COOKIE_PATH)
 
 
 @router.get("/me", response_model=UserResponse)

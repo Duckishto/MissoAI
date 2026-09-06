@@ -1,8 +1,23 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field, PostgresDsn
+from pydantic import Field, PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# libpq understands these; asyncpg does not. Managed providers such as Neon
+# and Supabase hand out libpq-style URLs, so they get stripped and translated
+# rather than passed through.
+_LIBPQ_ONLY_PARAMS = {
+    "sslmode",
+    "channel_binding",
+    "sslrootcert",
+    "sslcert",
+    "sslkey",
+    "sslpassword",
+    "gssencmode",
+    "target_session_attrs",
+}
 
 
 class Settings(BaseSettings):
@@ -38,6 +53,24 @@ class Settings(BaseSettings):
     # CORS -------------------------------------------------------------------
     allowed_origins: list[str] = ["http://localhost:3000"]
 
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _parse_origins(cls, value: Any) -> Any:
+        """Accept a JSON array, a comma-separated list, or a single origin.
+
+        Wrangler vars are plain strings. Requiring JSON here means a missing
+        pair of brackets crashes the app on import, the port never opens, and
+        the platform reports only that the container is not running.
+        """
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            return text
+        return [part.strip() for part in text.split(",") if part.strip()]
+
     # AI ---------------------------------------------------------------------
     # Phase 0 runs with this off. Every AI call path returns fixtures instead,
     # so the whole app is developable and testable without spending tokens.
@@ -56,7 +89,46 @@ class Settings(BaseSettings):
 
     @property
     def sqlalchemy_url(self) -> str:
-        return str(self.database_url).replace("postgresql://", "postgresql+asyncpg://", 1)
+        """asyncpg URL with libpq-only query parameters removed.
+
+        A Neon or Supabase string arrives as
+        `postgresql://...?sslmode=require&channel_binding=require`, and asyncpg
+        raises `TypeError: connect() got an unexpected keyword argument
+        'sslmode'` on it. TLS is carried by `db_connect_args` instead.
+        """
+        parts = urlsplit(str(self.database_url))
+        kept = [
+            (k, v)
+            for k, v in parse_qsl(parts.query, keep_blank_values=True)
+            if k.lower() not in _LIBPQ_ONLY_PARAMS
+        ]
+        return urlunsplit(
+            ("postgresql+asyncpg", parts.netloc, parts.path, urlencode(kept), parts.fragment)
+        )
+
+    @property
+    def alembic_url(self) -> str:
+        """Synchronous psycopg URL, used only for migrations.
+
+        asyncpg sends every statement as a prepared statement, and Postgres
+        rejects multi-statement SQL in that form. psycopg uses the simple query
+        protocol and reads libpq parameters such as sslmode straight from the
+        URL, so nothing needs stripping here.
+        """
+        return str(self.database_url).replace("postgresql://", "postgresql+psycopg://", 1)
+
+    @property
+    def db_connect_args(self) -> dict[str, Any]:
+        """TLS settings translated into what asyncpg expects."""
+        query = dict(parse_qsl(urlsplit(str(self.database_url)).query))
+        mode = query.get("sslmode", "").lower()
+        if mode == "disable":
+            return {}
+        if mode:
+            # verify-ca and verify-full need a root certificate to be supplied;
+            # require is the right default for a managed provider.
+            return {"ssl": "require"}
+        return {}
 
 
 @lru_cache

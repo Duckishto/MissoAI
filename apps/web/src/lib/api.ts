@@ -1,6 +1,7 @@
 /**
  * Thin API client. The access token lives in memory only; the refresh token
- * is an httpOnly cookie the browser sends to /auth/refresh and nowhere else.
+ * is an httpOnly cookie the browser sends to /api/v1/auth/refresh and nowhere
+ * else.
  */
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -9,6 +10,10 @@ let accessToken: string | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+}
+
+export function hasAccessToken(): boolean {
+  return accessToken !== null;
 }
 
 export class ApiError extends Error {
@@ -43,6 +48,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   return body as T;
+}
+
+/**
+ * Use the in-memory token if we have one, otherwise try the refresh cookie.
+ *
+ * Calling refresh unconditionally on every mount costs a round trip and, more
+ * importantly, turns a page load straight after login into a 401 whenever the
+ * cookie has not settled.
+ */
+export async function ensureSession(): Promise<boolean> {
+  if (accessToken) return true;
+  try {
+    const { access_token } = await api.refresh();
+    setAccessToken(access_token);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export interface TokenResponse {

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { type Course, api, setAccessToken } from "@/lib/api";
+import { type Course, api, ensureSession } from "@/lib/api";
 
 export default function CoursesPage() {
   const router = useRouter();
@@ -11,14 +11,24 @@ export default function CoursesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .refresh()
-      .then(({ access_token }) => {
-        setAccessToken(access_token);
-        return api.courses();
-      })
-      .then(setCourses)
-      .catch(() => router.push("/login"));
+    let cancelled = false;
+
+    (async () => {
+      if (!(await ensureSession())) {
+        router.push("/login");
+        return;
+      }
+      try {
+        const list = await api.courses();
+        if (!cancelled) setCourses(list);
+      } catch {
+        if (!cancelled) setError("Your courses could not be loaded. Try again in a moment.");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function begin(courseId: string) {
@@ -34,12 +44,11 @@ export default function CoursesPage() {
     <main className="mx-auto max-w-2xl px-6 py-16">
       <h1 className="reading text-2xl">Your courses</h1>
 
-      {courses === null && <p className="mt-6 text-sm text-ink-2">Loading.</p>}
+      {courses === null && !error && <p className="mt-6 text-sm text-ink-2">Loading.</p>}
 
       {courses?.length === 0 && (
         <p className="mt-6 max-w-[52ch] text-ink-2">
-          You are not enrolled in anything yet. Ask your instructor for an enrolment link,
-          or seed the demo course with <code>make seed</code>.
+          You are not enrolled in anything yet. Ask your instructor for an enrolment link.
         </p>
       )}
 
